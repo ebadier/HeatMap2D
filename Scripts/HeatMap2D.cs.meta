@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: edd53bd701618cf48a8ce9dfe1d4aa9f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - heatTex: {fileID: 2800000, guid: c41aec77444d1d74991b1e3c7611a0fe, type: 3}
+  - heatShader: {fileID: 4800000, guid: c76715d1e23a9054e93aea581f91ec1b, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
