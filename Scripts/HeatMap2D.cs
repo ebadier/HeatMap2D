@@ -8,13 +8,13 @@ namespace HeatMap2D
 	/// Put this script on a GameObject having a mesh renderer to draw a heatmap on it.
 	/// This class cannot render more than MAX_POINTS_COUNT points on a mesh because of shader performance limitation.
 	/// But you can draw much more points than this limit by first reducing your set of points using the provided clustering methods,
-	/// and then sending the reduced set of points using SetPoints().
+	/// and then sending the reduced set of points to the shader using SetPoints().
 	/// </summary>
 	public sealed class HeatMap2D : MonoBehaviour
 	{
 		// Unity maximum allowed array size for shaders.
 		// We can use ComputeBuffer to overpass this limit,
-		// but anyway shader performance drops too badly beyond this limit.
+		// but anyway shader performance drops too much beyond this limit.
 		public const int MAX_POINTS_COUNT = 1023;
 
 		public Material heatmapMaterial;
@@ -128,6 +128,7 @@ namespace HeatMap2D
 		/// Reduces the given set of points using Canopy clustering.
 		/// As a result, you get less points with more weights, which are representative of the original set of points.
 		/// Use this method to reduce a list of random points (no assumption can be made on the original set of points).
+		/// The only drawback of this method is : you don't have control over the new maximum number of points.
 		/// <param name="points">x,y,z components are 3D coordinates. w component is weight (should be > 0).</param>
 		/// <param name="maxDistance"/>Two points are averaged together if their distance is less than this value.<param/>
 		/// </summary>

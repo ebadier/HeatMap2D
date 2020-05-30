@@ -147,7 +147,7 @@ namespace HeatMap2D
 		private void _GenerateTrajectoryPoints()
 		{
 			_points.Clear();
-			float length = 0.0001f, lengthStep = 0.00025f;
+			float length = 0.0f, lengthStep = 0.00025f;
 			float angleRad = 0.0f, angleRadStep = Mathf.Deg2Rad * 0.5f;
 			Vector4 point = Vector4.zero;
 			Vector2 current = Vector2.zero;
