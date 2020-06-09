@@ -6,4 +6,4 @@
 - Complete tests scenes to understand the provided algorithms
 
 # System requirements
-Developed with Unity3D 2017.4.35f1 for Windows target platform.
+Developed with Unity3D 2017.4.35f1 (should also work with newer versions) for Windows target platform.
