@@ -6,7 +6,7 @@
 * 																																					  *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),  *
 * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,  *
-* and/or sell copies of the Software, and to permit persons to whom the Software isfurnished to do so, subject to the following conditions:			  *
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:		  *
 * 																																					  *
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.					  *
 * 																																					  *
@@ -23,9 +23,9 @@ using UnityEngine.Assertions;
 namespace HeatMap2D
 {
 	/// <summary>
-	/// Put this script on a GameObject having a mesh renderer to draw a heatmap on it.
+	/// This script draw a heatmap on a mesh in XZ plane.
 	/// This class cannot render more than MAX_POINTS_COUNT points on a mesh because of shader performance limitation.
-	/// But you can draw much more points than this limit by first reducing your set of points using the provided clustering methods,
+	/// But you can draw much more points than this limit by first reducing your set of points using the provided reduction methods,
 	/// and then sending the reduced set of points to the shader using SetPoints().
 	/// </summary>
 	public sealed class HeatMap2D : MonoBehaviour
@@ -39,6 +39,7 @@ namespace HeatMap2D
 		[Tooltip("Where to affect heatmap material : to MeshRenderer's sharedMaterial or material")]
 		public bool affectSharedMaterial = false;
 
+		private MeshRenderer _meshRenderer;
 		// to sample the distance from a hot point.
 		private float _radius = 0.1f;
 		// to change the amount of coloration.
@@ -71,8 +72,15 @@ namespace HeatMap2D
 			}
 		}
 
+		public Bounds WorldBounds
+		{
+			get { return _meshRenderer.bounds; }
+		}
+
 		private void Awake()
 		{
+			_meshRenderer = GetComponent<MeshRenderer>();
+
 			// Initialize shader variables.
 			heatmapMaterial.SetFloat(_invRadiusID, 1.0f / _radius);
 			heatmapMaterial.SetFloat(_intensityID, _intensity);
@@ -84,11 +92,11 @@ namespace HeatMap2D
 
 			if (affectSharedMaterial)
 			{
-				GetComponent<MeshRenderer>().sharedMaterial = heatmapMaterial;
+				_meshRenderer.sharedMaterial = heatmapMaterial;
 			}
 			else
 			{
-				GetComponent<MeshRenderer>().material = heatmapMaterial;
+				_meshRenderer.material = heatmapMaterial;
 			}
 		}
 
@@ -124,7 +132,7 @@ namespace HeatMap2D
 			//_computeBuffer.SetData(points);
 		}
 
-		#region Clustering
+		#region Algorithms
 		/// <summary>
 		/// Computes the weighted-average of the given 3D-weighted points.
 		/// x,y,z components are 3D coordinates. w component is weight (should be > 0).
@@ -143,31 +151,142 @@ namespace HeatMap2D
 		}
 
 		/// <summary>
-		/// Reduces the given set of points using Canopy clustering.
+		/// Returns the bounds of the given set of points.
+		/// </summary>
+		public static Bounds GetBounds(List<Vector4> points)
+		{
+			Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+			Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+			foreach (Vector4 point in points)
+			{
+				// X min/max
+				if (point.x > max.x)
+				{
+					max.x = point.x;
+				}
+				if (point.x < min.x)
+				{
+					min.x = point.x;
+				}
+				// Y min/max
+				if (point.y > max.y)
+				{
+					max.y = point.y;
+				}
+				if (point.y < min.y)
+				{
+					min.y = point.y;
+				}
+				// Z min/max
+				if (point.z > max.z)
+				{
+					max.z = point.z;
+				}
+				if (point.z < min.z)
+				{
+					min.z = point.z;
+				}
+			}
+			Bounds bounds = new Bounds();
+			bounds.SetMinMax(min, max);
+			return bounds;
+		}
+
+		/// <summary>
+		/// Reduces the given set of points using a grid partition in XZ plane.
 		/// As a result, you get less points with more weights, which are representative of the original set of points.
-		/// Use this method to reduce a list of random points (no assumption can be made on the original set of points).
-		/// The only drawback of this method is : you don't have control over the new maximum number of points.
+		/// This method is fast and gives high-fidelity results with any type of input points (randomly-generated, trajectories, ...).
 		/// <param name="points">x,y,z components are 3D coordinates. w component is weight (should be > 0).</param>
-		/// <param name="maxDistance"/>Two points are averaged together if their distance is less than this value.<param/>
+		/// <param name="maxPointsCount"/>The new maximum number of points. If maxPointsCount >= points.Count, do nothing and directly returns points.<param/>
+		/// </summary>
+		public static List<Vector4> GridPartition(List<Vector4> points, int maxPointsCount = MAX_POINTS_COUNT)
+		{
+			Assert.IsTrue(maxPointsCount >= 0, "[HeatMap2D.GridPartition2D] maxPointsCount should be >= 0 !");
+
+			if (maxPointsCount >= points.Count)
+			{
+				// Nothing to do.
+				return points;
+			}
+
+			List<Vector4> rPoints = new List<Vector4>(maxPointsCount);
+			if (maxPointsCount == 0)
+			{
+				// Someone could ask for this.
+				return rPoints;
+			}
+
+			// Get the cell lengths of the NxN square grid.
+			Bounds gridBounds = GetBounds(points);
+			Vector3 gridSize = gridBounds.size;
+			Vector3 gridMin = gridBounds.min;
+			int n = Mathf.FloorToInt(Mathf.Sqrt((float)maxPointsCount));
+			float cell_X_Length = gridSize.x / (float)n;
+			float cell_Z_Length = gridSize.z / (float)n;
+			// Average the points to one in each cell.
+			float cell_X_Min, cell_Z_Min, cell_X_Max, cell_Z_Max;
+			Vector4 rPoint = Vector4.zero;
+			bool emptyCell;
+			for (int i = 0; i < n; ++i) // rows
+			{
+				cell_X_Min = gridMin.x + (i * cell_X_Length);
+				cell_X_Max = cell_X_Min + cell_X_Length;
+				for (int j = 0; j < n; ++j) // cols
+				{
+					cell_Z_Min = gridMin.z + (j * cell_Z_Length);
+					cell_Z_Max = cell_Z_Min + cell_Z_Length;
+					emptyCell = true;
+					foreach (Vector4 point in points)
+					{
+						// Check if the point is in the current cell.
+						if ((point.x >= cell_X_Min) && (point.x < cell_X_Max) && (point.z >= cell_Z_Min) && (point.z < cell_Z_Max))
+						{
+							if (emptyCell)
+							{
+								rPoint = point;
+								emptyCell = false;
+							}
+							else
+							{
+								rPoint = WeightedAverage(rPoint, point);
+							}
+						}
+					}
+
+					if (!emptyCell)
+					{
+						rPoints.Add(rPoint);
+					}
+				}
+			}
+			return rPoints;
+		}
+
+		/// <summary>
+		/// Reduces the given set of points using Canopy clustering in XZ plane.
+		/// As a result, you get less points with more weights, which are representative of the original set of points.
+		/// This method is fast and gives high-fidelity results with any type of input points (randomly-generated, trajectories, ...).
+		/// But this method has one drawback : you can't control the new maximum number of points.
+		/// <param name="points">x,y,z components are 3D coordinates. w component is weight (should be > 0).</param>
+		/// <param name="maxDistance"/>Two points are averaged together if their XZ distance is less than this value.<param/>
 		/// </summary>
 		public static List<Vector4> CanopyClustering(List<Vector4> points, float maxDistance = 0.033f)
 		{
 			Assert.IsTrue(maxDistance > 0.0f, "[HeatMap2D.CanopyClustering] maxDistance should be > 0 !");
 
-			List<Vector4> rPoints = new List<Vector4>();
+			List<Vector4> rPoints = new List<Vector4>(MAX_POINTS_COUNT);
 			float sqrMaxDistance = maxDistance * maxDistance;
-			Vector3 dir = Vector3.zero;
+			Vector2 vecXZ = Vector2.zero;
 			Vector4 rPoint = Vector4.zero;
 			foreach (Vector4 point in points)
 			{
 				for (int i = 0; i < rPoints.Count; ++i)
 				{
 					rPoint = rPoints[i];
-					dir.Set(rPoint.x - point.x,
-							rPoint.y - point.y,
-							rPoint.z - point.z);
+					vecXZ.Set(	rPoint.x - point.x,
+								rPoint.z - point.z);
 					// Average only close points.
-					if (dir.sqrMagnitude < sqrMaxDistance)
+					if (vecXZ.sqrMagnitude < sqrMaxDistance)
 					{
 						// Tag this point as averaged (weight > 0).
 						if (rPoint.w < 0.0f)
@@ -187,17 +306,15 @@ namespace HeatMap2D
 		}
 
 		/// <summary>
-		/// Reduce the given set of points using Average clustering.
+		/// Reduces the given set of points using Decimation.
 		/// As a result, you get less points with more weights, which are representative of the original set of points.
-		/// You can use this method to reduce a list of non-randomly generated points (eg: trajectories).
-		/// - It allows you to control the new maximum number of points.
-		/// - In any other cases, prefer using Canopy clustering method.
+		/// This method is very fast and gives high-fidelity results with non-randomly generated input points only (e.g Trajectories).
 		/// <param name="points">x,y,z components are 3D coordinates. w component is weight (should be > 0).</param>
 		/// <param name="maxPointsCount"/>The new maximum number of points. If maxPointsCount >= points.Count, do nothing and directly returns points.<param/>
 		/// </summary>
-		public static List<Vector4> AverageClustering(List<Vector4> points, int maxPointsCount = MAX_POINTS_COUNT)
+		public static List<Vector4> Decimation(List<Vector4> points, int maxPointsCount = MAX_POINTS_COUNT)
 		{
-			Assert.IsTrue(maxPointsCount >= 0, "[HeatMap2D.AverageClustering] maxPointsCount should be >= 0 !");
+			Assert.IsTrue(maxPointsCount >= 0, "[HeatMap2D.Decimation] maxPointsCount should be >= 0 !");
 
 			if (maxPointsCount >= points.Count)
 			{
@@ -205,7 +322,7 @@ namespace HeatMap2D
 				return points;
 			}
 
-			List<Vector4> rPoints = new List<Vector4>();
+			List<Vector4> rPoints = new List<Vector4>(maxPointsCount);
 			if (maxPointsCount == 0)
 			{
 				// Someone could ask for this.
@@ -216,29 +333,12 @@ namespace HeatMap2D
 			int clustersSize = Mathf.CeilToInt((float)points.Count / (float)maxPointsCount);
 			int clustersCount = points.Count / clustersSize;
 			Vector4 rPoint;
-			// Average points in each cluster.
 			for (int i = 0; i < clustersCount; ++i)
 			{
-				rPoint = points[i * clustersSize]; // the first point in each cluster...
-				for (int j = 1; j < clustersSize; ++j)
-				{
-					/// ...is averaged with others points in the same cluster.
-					rPoint = WeightedAverage(rPoint, points[i*clustersSize + j]);
-				}
-				rPoints.Add(rPoint);
+				rPoint = points[i * clustersSize];
+				rPoint.w *= clustersSize; // Compensate the loss of other points.
+				rPoints.Add(rPoint); // Only keep the first point in each cluster
 			}
-			// Last cluster is empty or smaller than the others.
-			int lastClusterSize = points.Count - (clustersCount * clustersSize);
-			if (lastClusterSize > 0)
-			{
-				rPoint = points[points.Count - lastClusterSize];
-				for (int i = points.Count - lastClusterSize + 1; i < points.Count; ++i)
-				{
-					rPoint = WeightedAverage(rPoint, points[i]);
-				}
-				rPoints.Add(rPoint);
-			}
-			//Debug.Log("[HeatMap2D.AverageClustering] #Clusters (" + clustersCount +") ; Size (" + clustersSize + ") ; LastSize (" + lastClusterSize + ")");
 			return rPoints;
 		}
 		#endregion

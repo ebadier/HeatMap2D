@@ -6,7 +6,7 @@
 * 																																					  *
 * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"),  *
 * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense,  *
-* and/or sell copies of the Software, and to permit persons to whom the Software isfurnished to do so, subject to the following conditions:			  *
+* and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:		  *
 * 																																					  *
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.					  *
 * 																																					  *
@@ -70,30 +70,28 @@ namespace HeatMap2D
 		{
 			// Generate points.
 			_points.Clear();
-			float scaleFactor = (float)HeatMap2D.MAX_POINTS_COUNT / (float)pointsCount;
+			float scaleFactor = (float)HeatMap2D.MAX_POINTS_COUNT / (float)_pointsCount;
 			float length = 0.0f, lengthStep = 0.0005f * scaleFactor;
 			float angleRad = 0.0f, angleRadStep = Mathf.Deg2Rad * 0.5f;
-			Vector4 point = Vector4.zero;
-			Vector2 current = Vector2.zero;
-			Vector2 dir = new Vector2(1.0f, 0.0f);
-			while (_points.Count < pointsCount)
+			Vector4 point = new Vector4(0.0f, 0.0f, 0.0f, 1.0f);
+			Vector3 dir = new Vector3(0.0f, 0.0f, 1.0f);
+			while (_points.Count < _pointsCount)
 			{
 				// Add point.
-				point = transform.TransformPoint(current);
-				point.w = 1.0f;
 				_points.Add(point);
 				// Compute next point.
 				angleRad += angleRadStep;
 				length += lengthStep;
-				dir.Set(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
-				current = dir.normalized * length;
+				dir.Set(Mathf.Cos(angleRad), 0.0f, Mathf.Sin(angleRad));
+				point = dir.normalized * length;
+				point.w = 1.0f;
 			}
 
 			// Reduce points if needed.
 			if (_points.Count > HeatMap2D.MAX_POINTS_COUNT)
 			{
 				// Points reduction needed.
-				_meaningPoints = HeatMap2D.AverageClustering(_points, HeatMap2D.MAX_POINTS_COUNT);
+				_meaningPoints = HeatMap2D.Decimation(_points, HeatMap2D.MAX_POINTS_COUNT);
 				heatmap.SetPoints(_meaningPoints);
 				Debug.Log("[HeatMap2D_InfiniteTrajectoryTest] " + _points.Count + " points rendered using " + _meaningPoints.Count + " meaningful points.");
 			}
