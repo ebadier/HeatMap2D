@@ -158,7 +158,8 @@ namespace HeatMap2D
 		private void _GenerateTrajectoryPoints()
 		{
 			_points.Clear();
-			float length = 0.0f, lengthStep = 0.00025f;
+			Vector3 size = heatmap.WorldBounds.size;
+			float xLength = 0.0f, zLength = 0.0f, lengthStep = 0.00025f;
 			float angleRad = 0.0f, angleRadStep = Mathf.Deg2Rad * 0.5f;
 			Vector4 point = new Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 			Vector3 dir = new Vector3(0.0f, 0.0f, 1.0f);
@@ -168,9 +169,12 @@ namespace HeatMap2D
 				_points.Add(point);
 				// Compute next point.
 				angleRad += angleRadStep;
-				length += lengthStep;
+				xLength += lengthStep * size.x;
+				zLength += lengthStep * size.z;
 				dir.Set(Mathf.Cos(angleRad), 0.0f, Mathf.Sin(angleRad));
-				point = dir.normalized * length;
+				point = dir.normalized;
+				point.x *= xLength;
+				point.z *= zLength;
 				point.w = 1.0f;
 			}
 			Debug.Log("[HeatMap2D_Test] " + _points.Count + " points generated using Trajectory method.");
@@ -201,7 +205,7 @@ namespace HeatMap2D
 				if (_reductionMethod == ReductionMethod.GridPartition)
 				{
 					_meaningPoints = HeatMap2D.GridPartition(_points, _reducedPointsCount);
-					Debug.Log("[HeatMap2D_Test] " + _points.Count + " points reduced to " + _meaningPoints.Count + " points using Partition2D.");
+					Debug.Log("[HeatMap2D_Test] " + _points.Count + " points reduced to " + _meaningPoints.Count + " points using GridPartition.");
 				}
 				else if (_reductionMethod == ReductionMethod.CanopyClustering)
 				{

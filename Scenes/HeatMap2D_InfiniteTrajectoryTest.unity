@@ -251,8 +251,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   heatmap: {fileID: 749043198}
-  radius: 0.005
-  intensity: 0.1
+  radius: 0.01
+  intensity: 0.12
   pointsCount: 1023
 --- !u!1 &2005415199
 GameObject:

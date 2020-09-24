@@ -30,10 +30,10 @@ namespace HeatMap2D
 		public HeatMap2D heatmap;
 		[Range(0.001f, 1.0f)]
 		[Tooltip("Points' radius")]
-		public float radius = 0.005f;
+		public float radius = 0.01f;
 		[Range(0.001f, 1.0f)]
 		[Tooltip("Color intensity")]
-		public float intensity = 0.1f;
+		public float intensity = 0.12f;
 		[Range(0, 100000)]
 		[Tooltip("The number of points in the trajectory")]
 		public int pointsCount = HeatMap2D.MAX_POINTS_COUNT;
@@ -70,8 +70,9 @@ namespace HeatMap2D
 		{
 			// Generate points.
 			_points.Clear();
+			Vector3 size = heatmap.WorldBounds.size;
 			float scaleFactor = (float)HeatMap2D.MAX_POINTS_COUNT / (float)_pointsCount;
-			float length = 0.0f, lengthStep = 0.0005f * scaleFactor;
+			float xLength = 0.0f, zLength = 0.0f, lengthStep = 0.0005f * scaleFactor;
 			float angleRad = 0.0f, angleRadStep = Mathf.Deg2Rad * 0.5f;
 			Vector4 point = new Vector4(0.0f, 0.0f, 0.0f, 1.0f);
 			Vector3 dir = new Vector3(0.0f, 0.0f, 1.0f);
@@ -81,9 +82,12 @@ namespace HeatMap2D
 				_points.Add(point);
 				// Compute next point.
 				angleRad += angleRadStep;
-				length += lengthStep;
+				xLength += lengthStep * size.x;
+				zLength += lengthStep * size.z;
 				dir.Set(Mathf.Cos(angleRad), 0.0f, Mathf.Sin(angleRad));
-				point = dir.normalized * length;
+				point = dir.normalized;
+				point.x *= xLength;
+				point.z *= zLength;
 				point.w = 1.0f;
 			}
 
