@@ -6,4 +6,4 @@
 - Complete tests scenes to understand the provided algorithms (grid-partitioning, canopy-clustering, decimation)
 
 ## System requirements
-Developed with Unity3D 2017.4.35f1 (should also work with newer versions) for Windows target platform.
+Unity ***2017.4.35f1*** and newer versions
